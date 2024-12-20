@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog, QSizePolicy
-from PyQt5.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QClipboard
-from PyQt5.QtCore import Qt, QMimeData
+from PyQt5.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QClipboard, QKeyEvent
+from PyQt5.QtCore import Qt, QMimeData, QEvent
 
 class ImageApp(QWidget):
     def __init__(self):
@@ -21,6 +21,8 @@ class ImageApp(QWidget):
         # Entry for displaying image path and accepting pasted images
         self.image_path_entry = QLineEdit(self)
         self.image_path_entry.setPlaceholderText("Paste image path here or drag and drop an image")
+        self.image_path_entry.installEventFilter(self)  # Install event filter to capture paste events
+        self.image_path_entry.returnPressed.connect(self.load_image_from_path)  # Load image when Enter is pressed
         image_layout.addWidget(self.image_path_entry)
 
         # Browse Button to select image
@@ -62,9 +64,24 @@ class ImageApp(QWidget):
 
         # Set up clipboard monitoring
         self.clipboard = QApplication.clipboard()
-        self.clipboard.dataChanged.connect(self.paste_image)
-
         self.current_pixmap = None  # To keep track of the currently displayed image
+
+    def eventFilter(self, source, event):
+        """Override event filter to capture paste events."""
+        if event.type() == QKeyEvent.KeyPress and event.key() == Qt.Key_V and event.modifiers() == Qt.ControlModifier:
+            # Handle the paste action
+            mime_data = self.clipboard.mimeData()
+            if mime_data.hasImage():
+                image = self.clipboard.image()
+                self.display_image(image=image)
+                return True  # Event handled
+        return super().eventFilter(source, event)
+
+    def load_image_from_path(self):
+        """Load image from the path provided in the text box."""
+        file_path = self.image_path_entry.text()
+        if file_path:
+            self.display_image(file_path)
 
     def resizeEvent(self, event):
         """Override resize event to adjust QLabel size."""
@@ -91,13 +108,6 @@ class ImageApp(QWidget):
             file_path = event.mimeData().urls()[0].toLocalFile()
             self.image_path_entry.setText(file_path)
             self.display_image(file_path)
-
-    def paste_image(self):
-        """Handle pasting of images from clipboard."""
-        mime_data = self.clipboard.mimeData()
-        if mime_data.hasImage():
-            image = self.clipboard.image()
-            self.display_image(image=image)
 
     def display_image(self, file_path=None, image=None):
         """Display the selected or pasted image."""
