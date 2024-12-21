@@ -1,9 +1,11 @@
 import sys
+import os
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTextEdit, QFileDialog, QSizePolicy
 from PyQt5.QtGui import QPixmap, QImage, QDragEnterEvent, QDropEvent, QClipboard, QKeyEvent
 from PyQt5.QtCore import Qt, QMimeData, QEvent
+import requests
 
-class ImageApp(QWidget):
+class ImageUI(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -20,7 +22,7 @@ class ImageApp(QWidget):
         
         # Entry for displaying image path and accepting pasted images
         self.image_path_entry = QLineEdit(self)
-        self.image_path_entry.setPlaceholderText("Paste image path here or drag and drop an image")
+        self.image_path_entry.setPlaceholderText("Paste image path here and enter, or drag and drop an image")
         self.image_path_entry.installEventFilter(self)  # Install event filter to capture paste events
         self.image_path_entry.returnPressed.connect(self.load_image_from_path)  # Load image when Enter is pressed
         image_layout.addWidget(self.image_path_entry)
@@ -101,21 +103,39 @@ class ImageApp(QWidget):
         """Handle drag enter events."""
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+            print("Drag Enter Event")
+            print(event.mimeData().urls())  # Print the URLs of the dragged items
 
     def dropEvent(self, event: QDropEvent):
         """Handle drop events for drag-and-drop functionality."""
         if event.mimeData().hasUrls():
             file_path = event.mimeData().urls()[0].toLocalFile()
+            if file_path == '':
+                print("File path is empty")
+                file_path = event.mimeData().urls()[0].toString()
+                print("New File path: ", file_path)
+                response = requests.get(file_path)
+                image = QImage()
+                image.loadFromData(response.content)
+
             self.image_path_entry.setText(file_path)
-            self.display_image(file_path)
+            self.display_image(image=image)
+
 
     def display_image(self, file_path=None, image=None):
         """Display the selected or pasted image."""
         if file_path:
             image = QImage(file_path)
         
+        print("Image: ", image)
         if image:
             pixmap = QPixmap.fromImage(image)
+            # Ensure the directory exists
+            os.makedirs('./temp_images', exist_ok=True)
+            
+            # Save the pixmap to the specified directory
+            pixmap.save('./temp_images/displayed_image.png')
+            
             self.current_pixmap = pixmap
             self.adjust_pixmap(pixmap)
 
@@ -129,6 +149,6 @@ class ImageApp(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    ex = ImageApp()
+    ex = ImageUI()
     ex.show()
     sys.exit(app.exec_())
